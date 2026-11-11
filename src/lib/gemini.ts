@@ -104,3 +104,4 @@ function simularIndexacaoHeuristica(nomeArquivo: string, conteudoTexto: string):
     confidencial_provavel: confidencial,
   };
 }
+

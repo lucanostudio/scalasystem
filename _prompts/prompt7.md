@@ -81,3 +81,8 @@ Se todas as validações forem concluídas com sucesso:
 - Controle de acesso RBAC e auditoria de ações plenamente funcionais.
 - Dados e arquivos seguros e persistidos no Neon com RLS ativo.
 - Zero exposição de chaves ou dados sensíveis.
+
+https://github.com/lucanostudio/scalasystem.git
+
+git config --global user.name "lucanostudio"
+git config --global user.email "lucanostudio@gmail.com"

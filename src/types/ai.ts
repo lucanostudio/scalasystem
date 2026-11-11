@@ -6,3 +6,4 @@ export interface AIMetadataResult {
   status_sugerido: 'aprovado' | 'rascunho' | 'arquivado';
   confidencial_provavel: boolean;
 }
+
