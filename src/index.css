@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+:root {
+  --scala-primary: #013375;
+  --scala-light: #eef5fe;
+  --scala-dark: #010101;
+  --scala-red: #910113;
+  --scala-wine: #681726;
+  --scala-yellow: #f49c0e;
+  --scala-teal: #03889c;
+  --scala-green: #2f6746;
+  --scala-orange: #ff8b00;
+  --scala-blue-accent: #57a0ff;
+
+  --background: #eef5fe;
+  --foreground: #010101;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: 'Montserrat', sans-serif;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
