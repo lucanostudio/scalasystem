@@ -1,32 +1,52 @@
-# React + TypeScript + Vite
+# Scalasystem — Acervo Digital da RNSMM
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Repositório digital para governança, centralização, proteção e indexação inteligente do acervo de conhecimento da **Rede Scalabriniana de Missões com Migrantes (RNSMM)**.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🚀 Tecnologias
 
-## React Compiler
+- **Frontend:** React 19, TypeScript, Vite 8
+- **Estilização:** Tailwind CSS v4, Lucide Icons, Shadcn/UI Patterns
+- **Tipografia:** Montserrat
+- **Banco de Dados:** PostgreSQL Serverless via **Neon**
+- **Segurança:** Row Level Security (RLS) e RBAC (*Admin*, *Editor*, *Leitor*)
+- **Inteligência Artificial:** Google Gen AI SDK (`@google/generative-ai`) com modelo Gemini para extração de metadados
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the Oxlint configuration
+## 🔒 Proteção e Variáveis de Ambiente
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+O arquivo `.env` está protegido pelo `.gitignore` e **nunca** deve ser versionado no GitHub. 
+Para deploys na **Vercel** ou em outros provedores, configure as seguintes variáveis diretamente no painel:
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+| Variável | Descrição |
+|---|---|
+| `VITE_DATABASE_URL` | String de conexão segura com o Neon PostgreSQL (com pooling e SSL) |
+| `VITE_GEMINI_API_KEY` | Chave de API do Google Gemini para indexação inteligente |
+
+Consulte o arquivo [`.env.example`](file:///d:/Lucas/Scalasystem/.env.example) para referência.
+
+---
+
+## 📦 Como Rodar Localmente
+
+```bash
+# 1. Instalar dependências
+npm install
+
+# 2. Executar em modo desenvolvimento
+npm run dev
+
+# 3. Gerar build de produção
+npm run build
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+---
+
+## 🌐 Deploy na Vercel
+
+1. Crie um novo projeto na [Vercel](https://vercel.com).
+2. Conecte este repositório do GitHub.
+3. Em **Environment Variables**, adicione as variáveis documentadas acima.
+4. Clique em **Deploy**.
