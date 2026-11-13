@@ -33,3 +33,5 @@ dist-ssr
 
 # Configurações internas do Neon e Prompts
 .neon-config.md
+_prompts
+

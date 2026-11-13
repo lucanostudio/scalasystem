@@ -141,14 +141,25 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     }
 
     setIsAnalyzingIA(true);
-    setIaMessage('Analisando documento e extraindo metadados com Gemini...');
+    setIaMessage('Analisando conteúdo...');
     setError(null);
+
+    // Mensagens dinâmicas de feedback visual
+    const timer1 = setTimeout(() => {
+      setIaMessage('IA extraindo metadados...');
+    }, 900);
+    const timer2 = setTimeout(() => {
+      setIaMessage('Categorizando documento...');
+    }, 1800);
 
     try {
       const result = await indexarDocumentoComIA(
         selectedFile ? selectedFile.name : titulo,
         descricao
       );
+
+      clearTimeout(timer1);
+      clearTimeout(timer2);
 
       setDescricao(result.resumo);
       setDepartamento(result.departamento_sugerido);
@@ -160,12 +171,14 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       const combinedTags = Array.from(new Set([...tags, ...result.tags_sugeridas]));
       setTags(combinedTags);
 
-      setIaMessage('✨ Metadados preenchidos com sucesso pela IA!');
-      setTimeout(() => setIaMessage(null), 4000);
+      setIaMessage('✨ Metadados preenchidos com sucesso pela IA! Você pode revisar e editar cada campo.');
+      setTimeout(() => setIaMessage(null), 5000);
       setActiveTab('classificacao');
     } catch (err: any) {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
       console.error('Erro na indexação com IA:', err);
-      setError('Não foi possível indexar o documento com IA no momento.');
+      setError('Não foi possível indexar o documento com IA no momento. Deseja tentar novamente ou preencher manualmente?');
     } finally {
       setIsAnalyzingIA(false);
     }

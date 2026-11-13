@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { sql } from '@/lib/neon';
+import { indexarDocumentoComIA } from '@/lib/gemini';
 import type { Arquivo } from '@/types/arquivo';
 import {
   X,
@@ -23,7 +24,10 @@ import {
   RotateCcw,
   AlertTriangle,
   ZoomIn,
-  ZoomOut
+  ZoomOut,
+  Sparkles,
+  Check,
+  Edit2
 } from 'lucide-react';
 
 interface VersaoItem {
@@ -57,6 +61,113 @@ export const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({
   const [newVersionNotes, setNewVersionNotes] = useState('');
   const [uploadingVersion, setUploadingVersion] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
+
+  // Estados de Edição e Indexação com IA
+  const [isReindexingIA, setIsReindexingIA] = useState(false);
+  const [iaFeedbackMessage, setIaFeedbackMessage] = useState<string | null>(null);
+  const [iaErrorMessage, setIaErrorMessage] = useState<string | null>(null);
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editDescricao, setEditDescricao] = useState('');
+  const [editDepartamento, setEditDepartamento] = useState('');
+  const [editAno, setEditAno] = useState<number>(2026);
+  const [editStatus, setEditStatus] = useState<'rascunho' | 'aprovado' | 'arquivado'>('aprovado');
+  const [editTags, setEditTags] = useState<string[]>([]);
+  const [newTagInput, setNewTagInput] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  useEffect(() => {
+    if (arquivo) {
+      setEditDescricao(arquivo.descricao || '');
+      setEditDepartamento(arquivo.departamento || 'Coordenação RNSMM');
+      setEditAno(arquivo.ano_publicacao || new Date().getFullYear());
+      setEditStatus(arquivo.status || 'aprovado');
+      setEditTags(Array.isArray(arquivo.tags) ? [...arquivo.tags] : []);
+    }
+  }, [arquivo]);
+
+  const handleIndexarDocumentoComIA = async () => {
+    if (!arquivo) return;
+    setIsReindexingIA(true);
+    setIaErrorMessage(null);
+    setIaFeedbackMessage('Analisando conteúdo...');
+
+    const timer1 = setTimeout(() => {
+      setIaFeedbackMessage('IA extraindo metadados...');
+    }, 900);
+    const timer2 = setTimeout(() => {
+      setIaFeedbackMessage('Categorizando documento...');
+    }, 1800);
+
+    try {
+      const result = await indexarDocumentoComIA(arquivo.nome_original || arquivo.titulo, editDescricao);
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+
+      setEditDescricao(result.resumo);
+      setEditDepartamento(result.departamento_sugerido);
+      setEditAno(result.ano_publicacao_estimado);
+      setEditStatus(result.status_sugerido);
+
+      const combined = Array.from(new Set([...editTags, ...result.tags_sugeridas]));
+      setEditTags(combined);
+
+      setIsEditing(true);
+      setIaFeedbackMessage('✨ Metadados sugeridos com sucesso pela IA! Revise e clique em "Salvar Alterações".');
+      setTimeout(() => setIaFeedbackMessage(null), 6000);
+    } catch (err) {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      console.error('Erro na indexação sob demanda com IA:', err);
+      setIaErrorMessage('Não foi possível indexar o documento com IA no momento. Deseja tentar novamente ou preencher manualmente?');
+      setTimeout(() => setIaErrorMessage(null), 7000);
+    } finally {
+      setIsReindexingIA(false);
+    }
+  };
+
+  const handleSalvarEdicoes = async () => {
+    if (!arquivo || !user) return;
+    setSavingEdit(true);
+    try {
+      await sql`
+        UPDATE arquivos
+        SET descricao = ${editDescricao.trim() || null},
+            departamento = ${editDepartamento.trim() || null},
+            ano_publicacao = ${editAno},
+            status = ${editStatus},
+            tags = ${editTags},
+            updated_at = NOW()
+        WHERE id = ${arquivo.id}::uuid;
+      `;
+
+      await sql`
+        INSERT INTO logs_auditoria (usuario_id, arquivo_id, acao, ip_address, user_agent)
+        VALUES (${user.id}::uuid, ${arquivo.id}::uuid, 'atualizacao_metadados_ia', '192.168.1.10', ${navigator.userAgent});
+      `;
+
+      setIsEditing(false);
+      onUpdated();
+      setIaFeedbackMessage('✅ Metadados atualizados e auditados com sucesso!');
+      setTimeout(() => setIaFeedbackMessage(null), 4000);
+    } catch (err) {
+      console.error('Erro ao salvar metadados atualizados:', err);
+      alert('Erro ao persistir as alterações no banco de dados.');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleAddEditTag = () => {
+    if (newTagInput.trim() && !editTags.includes(newTagInput.trim().toLowerCase())) {
+      setEditTags([...editTags, newTagInput.trim().toLowerCase()]);
+      setNewTagInput('');
+    }
+  };
+
+  const handleRemoveEditTag = (tagToRemove: string) => {
+    setEditTags(editTags.filter((t) => t !== tagToRemove));
+  };
 
   useEffect(() => {
     if (isOpen && arquivo) {
@@ -494,92 +605,254 @@ export const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({
                   <h3 className="font-bold uppercase text-[#013375] tracking-wider">
                     Metadados do Arquivo
                   </h3>
-                  <button
-                    onClick={() => setShowVersionsTab(true)}
-                    className="text-[11px] text-[#013375] font-semibold hover:underline cursor-pointer"
-                  >
-                    Ver Versões
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowVersionsTab(true)}
+                      className="text-[11px] text-[#013375] font-semibold hover:underline cursor-pointer"
+                    >
+                      Ver Versões
+                    </button>
+                  </div>
                 </div>
 
-                <div className="space-y-3">
-                  <div>
-                    <span className="text-slate-400 font-semibold block text-[10px] uppercase">
-                      Categoria / Pasta
-                    </span>
-                    <span className="font-bold text-[#013375]">{arquivo.categoria_nome || 'Geral'}</span>
-                  </div>
-
-                  <div>
-                    <span className="text-slate-400 font-semibold block text-[10px] uppercase">
-                      Autor / Responsável
-                    </span>
-                    <span className="font-semibold text-slate-800">{arquivo.autor || 'N/D'}</span>
-                  </div>
-
-                  <div>
-                    <span className="text-slate-400 font-semibold block text-[10px] uppercase">
-                      Departamento
-                    </span>
-                    <span className="font-semibold text-slate-800">{arquivo.departamento || 'Geral'}</span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <span className="text-slate-400 font-semibold block text-[10px] uppercase">
-                        Ano
+                {/* Botão de Auto-Indexação com IA sob Demanda */}
+                {canEdit && (
+                  <div className="p-3 bg-[#eef5fe] border border-[#013375]/20 rounded-2xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-[#013375] flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-[#f49c0e]" /> Inteligência Artificial
                       </span>
-                      <span className="font-semibold text-slate-800">{arquivo.ano_publicacao || 2026}</span>
+                      {!isEditing && (
+                        <button
+                          type="button"
+                          onClick={() => setIsEditing(true)}
+                          className="text-[10px] text-slate-500 hover:text-[#013375] flex items-center gap-1 cursor-pointer font-semibold"
+                        >
+                          <Edit2 className="w-3 h-3" /> Editar
+                        </button>
+                      )}
                     </div>
+                    <button
+                      type="button"
+                      disabled={isReindexingIA}
+                      onClick={handleIndexarDocumentoComIA}
+                      className="w-full py-2 bg-[#f49c0e] hover:bg-[#ff8b00] text-[#010101] text-xs font-black rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>{isReindexingIA ? 'Indexando...' : '✨ Indexar Documento com IA'}</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Feedback IA */}
+                {iaFeedbackMessage && (
+                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>{iaFeedbackMessage}</span>
+                  </div>
+                )}
+                {iaErrorMessage && (
+                  <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-[11px] flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                    <span>{iaErrorMessage}</span>
+                  </div>
+                )}
+
+                {isEditing ? (
+                  /* MODO EDIÇÃO / VALIDAÇÃO HUMANA */
+                  <div className="space-y-3 bg-white p-3 rounded-2xl border border-slate-200">
                     <div>
-                      <span className="text-slate-400 font-semibold block text-[10px] uppercase">
-                        Status
-                      </span>
-                      <span className="font-bold uppercase text-[#2f6746]">{arquivo.status}</span>
+                      <label className="text-slate-500 font-semibold block text-[10px] uppercase mb-1">
+                        Resumo / Descrição
+                      </label>
+                      <textarea
+                        value={editDescricao}
+                        onChange={(e) => setEditDescricao(e.target.value)}
+                        rows={3}
+                        className="w-full bg-[#eef5fe]/40 border border-slate-300 rounded-xl p-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#013375]"
+                      />
                     </div>
-                  </div>
 
-                  <div>
-                    <span className="text-slate-400 font-semibold block text-[10px] uppercase">
-                      Criado por
-                    </span>
-                    <span className="font-semibold text-slate-800">{arquivo.criador_nome || 'Sistema'}</span>
-                    <span className="text-[10px] text-slate-400 block">
-                      {new Date(arquivo.created_at).toLocaleString('pt-BR')}
-                    </span>
-                  </div>
-
-                  {/* Tags */}
-                  {arquivo.tags && arquivo.tags.length > 0 && (
                     <div>
-                      <span className="text-slate-400 font-semibold block text-[10px] uppercase mb-1">
-                        Tags Indexadas
-                      </span>
-                      <div className="flex flex-wrap gap-1">
-                        {arquivo.tags.map((t) => (
+                      <label className="text-slate-500 font-semibold block text-[10px] uppercase mb-1">
+                        Departamento
+                      </label>
+                      <input
+                        type="text"
+                        value={editDepartamento}
+                        onChange={(e) => setEditDepartamento(e.target.value)}
+                        className="w-full bg-[#eef5fe]/40 border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#013375]"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-slate-500 font-semibold block text-[10px] uppercase mb-1">
+                          Ano
+                        </label>
+                        <input
+                          type="number"
+                          value={editAno}
+                          onChange={(e) => setEditAno(Number(e.target.value))}
+                          className="w-full bg-[#eef5fe]/40 border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#013375]"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-slate-500 font-semibold block text-[10px] uppercase mb-1">
+                          Status
+                        </label>
+                        <select
+                          value={editStatus}
+                          onChange={(e) => setEditStatus(e.target.value as any)}
+                          className="w-full bg-[#eef5fe]/40 border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#013375]"
+                        >
+                          <option value="aprovado">Aprovado</option>
+                          <option value="rascunho">Rascunho</option>
+                          <option value="arquivado">Arquivado</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-slate-500 font-semibold block text-[10px] uppercase mb-1">
+                        Tags Sugeridas / Indexadas
+                      </label>
+                      <div className="flex gap-1.5 mb-2">
+                        <input
+                          type="text"
+                          value={newTagInput}
+                          onChange={(e) => setNewTagInput(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddEditTag())}
+                          placeholder="Adicionar tag..."
+                          className="flex-1 bg-[#eef5fe]/40 border border-slate-300 rounded-xl px-2 py-1 text-xs text-slate-800 focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddEditTag}
+                          className="px-2.5 py-1 bg-[#013375] text-white rounded-xl text-xs font-bold"
+                        >
+                          +
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                        {editTags.map((t) => (
                           <span
                             key={t}
-                            className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#eef5fe] text-[#013375]"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#eef5fe] text-[#013375]"
                           >
                             #{t}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveEditTag(t)}
+                              className="hover:text-red-600 cursor-pointer"
+                            >
+                              ×
+                            </button>
                           </span>
                         ))}
                       </div>
                     </div>
-                  )}
 
-                  {/* Aviso Confidencial */}
-                  {arquivo.is_confidencial && (
-                    <div className="p-3 bg-[#910113]/10 border border-[#910113]/20 rounded-xl text-slate-700">
-                      <div className="flex items-center gap-1.5 font-bold text-[#910113] text-[11px]">
-                        <AlertTriangle className="w-3.5 h-3.5" /> Documento Protegido
-                      </div>
-                      <p className="text-[10px] text-slate-500 mt-1">
-                        Marca d'água dinâmica rastreável com sua identificação institucional aplicada a qualquer download ou exibição.
-                      </p>
+                    <div className="pt-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleSalvarEdicoes}
+                        disabled={savingEdit}
+                        className="flex-1 py-1.5 bg-[#2f6746] hover:bg-[#3d835a] text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1 transition cursor-pointer"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>{savingEdit ? 'Salvando...' : 'Salvar Alterações'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditing(false)}
+                        className="px-3 py-1.5 bg-slate-200 text-slate-700 hover:bg-slate-300 font-semibold text-xs rounded-xl cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
                     </div>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  /* MODO VISUALIZAÇÃO PADRÃO */
+                  <div className="space-y-3">
+                    <div>
+                      <span className="text-slate-400 font-semibold block text-[10px] uppercase">
+                        Categoria / Pasta
+                      </span>
+                      <span className="font-bold text-[#013375]">{arquivo.categoria_nome || 'Geral'}</span>
+                    </div>
+
+                    <div>
+                      <span className="text-slate-400 font-semibold block text-[10px] uppercase">
+                        Autor / Responsável
+                      </span>
+                      <span className="font-semibold text-slate-800">{arquivo.autor || 'N/D'}</span>
+                    </div>
+
+                    <div>
+                      <span className="text-slate-400 font-semibold block text-[10px] uppercase">
+                        Departamento
+                      </span>
+                      <span className="font-semibold text-slate-800">{arquivo.departamento || 'Geral'}</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <span className="text-slate-400 font-semibold block text-[10px] uppercase">
+                          Ano
+                        </span>
+                        <span className="font-semibold text-slate-800">{arquivo.ano_publicacao || 2026}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-semibold block text-[10px] uppercase">
+                          Status
+                        </span>
+                        <span className="font-bold uppercase text-[#2f6746]">{arquivo.status}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-slate-400 font-semibold block text-[10px] uppercase">
+                        Criado por
+                      </span>
+                      <span className="font-semibold text-slate-800">{arquivo.criador_nome || 'Sistema'}</span>
+                      <span className="text-[10px] text-slate-400 block">
+                        {new Date(arquivo.created_at).toLocaleString('pt-BR')}
+                      </span>
+                    </div>
+
+                    {/* Tags */}
+                    {arquivo.tags && arquivo.tags.length > 0 && (
+                      <div>
+                        <span className="text-slate-400 font-semibold block text-[10px] uppercase mb-1">
+                          Tags Indexadas
+                        </span>
+                        <div className="flex flex-wrap gap-1">
+                          {arquivo.tags.map((t) => (
+                            <span
+                              key={t}
+                              className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#eef5fe] text-[#013375]"
+                            >
+                              #{t}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Aviso Confidencial */}
+                    {arquivo.is_confidencial && (
+                      <div className="p-3 bg-[#910113]/10 border border-[#910113]/20 rounded-xl text-slate-700">
+                        <div className="flex items-center gap-1.5 font-bold text-[#910113] text-[11px]">
+                          <AlertTriangle className="w-3.5 h-3.5" /> Documento Protegido
+                        </div>
+                        <p className="text-[10px] text-slate-500 mt-1">
+                          Marca d'água dinâmica rastreável com sua identificação institucional aplicada a qualquer download ou exibição.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
