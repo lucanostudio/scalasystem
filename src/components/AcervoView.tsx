@@ -30,7 +30,12 @@ import {
   ArrowUpDown,
   SlidersHorizontal,
   X,
-  RotateCcw
+  RotateCcw,
+  ChevronLeft,
+  ChevronRight,
+  GalleryHorizontal,
+  Film,
+  Camera
 } from 'lucide-react';
 
 export const AcervoView: React.FC = () => {
@@ -38,7 +43,8 @@ export const AcervoView: React.FC = () => {
   const [arquivos, setArquivos] = useState<Arquivo[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'table' | 'carousel'>('grid');
+  const [carouselIndex, setCarouselIndex] = useState(0);
 
   // Filtros Avançados & Drawer
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
@@ -301,6 +307,73 @@ export const AcervoView: React.FC = () => {
     return matchesSearch && matchesCat && matchesDepto && matchesTipo && matchesStatus && matchesAno && matchesTags;
   });
 
+  const renderCover = (arq: Arquivo) => {
+    const isImage = ['png', 'jpg', 'jpeg', 'svg'].includes(arq.extensao.toLowerCase());
+    const isVideo = ['mp4', 'mov'].includes(arq.extensao.toLowerCase());
+
+    if (isImage && arq.url_armazenamento && !arq.url_armazenamento.includes('fake')) {
+      return (
+        <div className="relative w-full h-40 bg-slate-100 overflow-hidden flex items-center justify-center">
+          <img
+            src={arq.url_armazenamento}
+            alt={arq.titulo}
+            className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+            onError={(e) => {
+              (e.target as any).style.display = 'none';
+            }}
+          />
+          <div className="absolute top-2.5 left-2.5 p-1.5 bg-black/40 backdrop-blur-xs text-white rounded-lg">
+            <Camera className="w-3.5 h-3.5" />
+          </div>
+        </div>
+      );
+    }
+
+    if (isVideo) {
+      return (
+        <div className="relative w-full h-40 bg-gradient-to-br from-slate-900 to-slate-800 text-white flex flex-col items-center justify-center overflow-hidden">
+          <div className="p-3 bg-[#ff8b00]/20 rounded-2xl border border-[#ff8b00]/40 group-hover:scale-110 transition duration-300">
+            <Film className="w-8 h-8 text-[#ff8b00]" />
+          </div>
+          <span className="text-[10px] uppercase font-bold tracking-widest text-[#ff8b00] mt-2">
+            Mídia de Vídeo • {arq.extensao.toUpperCase()}
+          </span>
+        </div>
+      );
+    }
+
+    // Capa de Documento Formal (PDF, DOCX, Planilha, etc.)
+    return (
+      <div className="relative w-full h-40 bg-gradient-to-b from-[#eef5fe] to-slate-100 p-4 flex flex-col justify-between border-b border-slate-100 overflow-hidden select-none">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <div className="p-1.5 bg-white rounded-lg shadow-xs">
+              {getMediaIcon(arq.extensao)}
+            </div>
+            <span className="text-[10px] font-bold text-[#013375] uppercase tracking-wider font-mono">
+              {arq.extensao.toUpperCase()}
+            </span>
+          </div>
+          <span className="text-[9px] font-bold text-slate-400">
+            Scalasystem Doc
+          </span>
+        </div>
+
+        <div className="py-2">
+          <div className="text-[11px] font-bold text-slate-800 line-clamp-2 leading-snug">
+            {arq.titulo}
+          </div>
+          <div className="w-10 h-0.5 bg-[#013375]/30 rounded-full mt-2" />
+        </div>
+
+        <div className="flex items-center justify-between text-[9px] text-slate-400 pt-1 border-t border-slate-200/60">
+          <span>{arq.categoria_nome || 'Geral'}</span>
+          <span>{arq.ano_publicacao || 2026}</span>
+        </div>
+      </div>
+    );
+  };
+
   const canUpload = user?.role === 'admin' || user?.role === 'editor';
 
   return (
@@ -337,71 +410,159 @@ export const AcervoView: React.FC = () => {
           <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 shadow-xs">
             <button
               onClick={() => setViewMode('grid')}
-              title="Visualização em Grade"
-              className={`p-2 rounded-lg transition cursor-pointer ${
+              title="Visualização em Cards"
+              className={`p-2 rounded-lg transition cursor-pointer flex items-center gap-1.5 text-xs font-bold ${
                 viewMode === 'grid'
-                  ? 'bg-[#013375] text-white'
+                  ? 'bg-[#013375] text-white shadow-xs'
                   : 'text-slate-400 hover:text-slate-700'
               }`}
             >
               <LayoutGrid className="w-4 h-4" />
+              <span className="hidden sm:inline">Cards</span>
+            </button>
+            <button
+              onClick={() => {
+                setViewMode('carousel');
+                setCarouselIndex(0);
+              }}
+              title="Visualização em Carrossel"
+              className={`p-2 rounded-lg transition cursor-pointer flex items-center gap-1.5 text-xs font-bold ${
+                viewMode === 'carousel'
+                  ? 'bg-[#013375] text-white shadow-xs'
+                  : 'text-slate-400 hover:text-slate-700'
+              }`}
+            >
+              <GalleryHorizontal className="w-4 h-4" />
+              <span className="hidden sm:inline">Carrossel</span>
             </button>
             <button
               onClick={() => setViewMode('table')}
               title="Visualização em Lista"
-              className={`p-2 rounded-lg transition cursor-pointer ${
+              className={`p-2 rounded-lg transition cursor-pointer flex items-center gap-1.5 text-xs font-bold ${
                 viewMode === 'table'
-                  ? 'bg-[#013375] text-white'
+                  ? 'bg-[#013375] text-white shadow-xs'
                   : 'text-slate-400 hover:text-slate-700'
               }`}
             >
               <List className="w-4 h-4" />
+              <span className="hidden sm:inline">Lista</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Barra de Busca Textual (Full-Text Search) & Botão Drawer de Filtros */}
-      <div className="bg-white rounded-2xl p-4 border border-[#013375]/10 shadow-xs flex flex-col md:flex-row gap-3 items-center justify-between">
-        <div className="relative w-full md:w-96">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Pesquisa rápida (título, autor, departamento, conteúdo)..."
-            className="w-full bg-[#eef5fe]/60 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#013375]"
-          />
+      {/* Barra de Busca Textual (Full-Text Search) & Botões de Categorias Mais Buscadas */}
+      <div className="bg-white rounded-3xl p-4 border border-[#013375]/10 shadow-xs space-y-3">
+        <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
+          <div className="relative w-full md:flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Pesquisa rápida (título, autor, departamento, conteúdo)..."
+              className="w-full bg-[#eef5fe]/60 border border-slate-200 rounded-2xl pl-10 pr-4 py-2.5 text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#013375]"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end shrink-0">
+            <button
+              onClick={() => setIsFilterDrawerOpen(true)}
+              className={`px-4 py-2.5 rounded-2xl border text-xs font-bold flex items-center gap-2 transition cursor-pointer ${
+                hasActiveFilters
+                  ? 'bg-[#013375] text-white border-[#013375] shadow-xs'
+                  : 'bg-[#eef5fe]/60 text-slate-700 border-slate-200 hover:bg-[#eef5fe]'
+              }`}
+            >
+              <SlidersHorizontal className="w-4 h-4 text-[#57a0ff]" />
+              <span>Filtros Avançados</span>
+              {hasActiveFilters && (
+                <span className="w-2 h-2 rounded-full bg-[#ff8b00]" />
+              )}
+            </button>
+
+            {hasActiveFilters && (
+              <button
+                onClick={handleLimparFiltros}
+                className="text-xs text-slate-500 hover:text-[#910113] font-semibold flex items-center gap-1 cursor-pointer px-2"
+              >
+                <RotateCcw className="w-3.5 h-3.5" /> Limpar
+              </button>
+            )}
+
+            <div className="text-xs font-bold text-slate-500 pl-2 border-l border-slate-200">
+              {filteredArquivos.length} {filteredArquivos.length === 1 ? 'resultado' : 'resultados'}
+            </div>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end">
+        {/* Botões das Categorias / Tipos Mais Buscados */}
+        <div className="pt-2 border-t border-slate-100 flex items-center gap-2 flex-wrap">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mr-1">
+            <Tag className="w-3.5 h-3.5 text-[#57a0ff]" /> Mais Buscados:
+          </span>
+
           <button
-            onClick={() => setIsFilterDrawerOpen(true)}
-            className={`px-4 py-2.5 rounded-xl border text-xs font-bold flex items-center gap-2 transition cursor-pointer ${
-              hasActiveFilters
-                ? 'bg-[#013375] text-white border-[#013375] shadow-xs'
-                : 'bg-[#eef5fe]/60 text-slate-700 border-slate-200 hover:bg-[#eef5fe]'
+            type="button"
+            onClick={() => {
+              if (selectedTipo === 'doc' || selectedTipo === 'pdf') {
+                setSelectedTipo('all');
+              } else {
+                setSelectedTipo('doc');
+              }
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              selectedTipo === 'doc' || selectedTipo === 'pdf'
+                ? 'bg-[#013375] text-white shadow-xs'
+                : 'bg-[#eef5fe] text-[#013375] hover:bg-[#013375]/10'
             }`}
           >
-            <SlidersHorizontal className="w-4 h-4 text-[#57a0ff]" />
-            <span>Filtros Avançados</span>
-            {hasActiveFilters && (
-              <span className="w-2 h-2 rounded-full bg-[#ff8b00]" />
-            )}
+            <FileText className="w-3.5 h-3.5" />
+            <span>Documentos Oficiais</span>
+            {(selectedTipo === 'doc' || selectedTipo === 'pdf') && <CheckCircle2 className="w-3 h-3" />}
           </button>
 
-          {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedTipo(selectedTipo === 'imagem' ? 'all' : 'imagem');
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              selectedTipo === 'imagem'
+                ? 'bg-[#03889c] text-white shadow-xs'
+                : 'bg-[#eef5fe] text-[#03889c] hover:bg-[#03889c]/10'
+            }`}
+          >
+            <Camera className="w-3.5 h-3.5" />
+            <span>Fotografias</span>
+            {selectedTipo === 'imagem' && <CheckCircle2 className="w-3 h-3" />}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedTipo(selectedTipo === 'video' ? 'all' : 'video');
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              selectedTipo === 'video'
+                ? 'bg-[#ff8b00] text-white shadow-xs'
+                : 'bg-[#eef5fe] text-[#ff8b00] hover:bg-[#ff8b00]/10'
+            }`}
+          >
+            <Film className="w-3.5 h-3.5" />
+            <span>Vídeos</span>
+            {selectedTipo === 'video' && <CheckCircle2 className="w-3 h-3" />}
+          </button>
+
+          {selectedTipo !== 'all' && (
             <button
-              onClick={handleLimparFiltros}
-              className="text-xs text-slate-500 hover:text-[#910113] font-semibold flex items-center gap-1 cursor-pointer px-2"
+              type="button"
+              onClick={() => setSelectedTipo('all')}
+              className="text-[11px] text-slate-400 hover:text-[#910113] font-semibold underline cursor-pointer ml-1"
             >
-              <RotateCcw className="w-3.5 h-3.5" /> Limpar
+              Ver todos os tipos
             </button>
           )}
-
-          <div className="text-xs font-bold text-slate-500 pl-2 border-l border-slate-200">
-            {filteredArquivos.length} {filteredArquivos.length === 1 ? 'resultado' : 'resultados'}
-          </div>
         </div>
       </div>
 
@@ -441,38 +602,228 @@ export const AcervoView: React.FC = () => {
             Limpar Todos os Filtros
           </button>
         </div>
+      ) : viewMode === 'carousel' ? (
+        /* VISUALIZAÇÃO EM CARROSSEL */
+        <div className="bg-white rounded-3xl p-6 border border-[#013375]/10 shadow-xs space-y-6">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+            <div>
+              <h3 className="text-sm font-bold text-[#013375] flex items-center gap-2">
+                <GalleryHorizontal className="w-4 h-4 text-[#57a0ff]" /> Destaques do Acervo em Carrossel
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Navegue interativamente pelos documentos, mídias e registros históricos catalogados.
+              </p>
+            </div>
+
+            {/* Controles de Navegação */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-500 mr-2">
+                {filteredArquivos.length > 0 ? carouselIndex + 1 : 0} de {filteredArquivos.length}
+              </span>
+              <button
+                type="button"
+                disabled={carouselIndex === 0}
+                onClick={() => setCarouselIndex((prev) => Math.max(0, prev - 1))}
+                className="p-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-[#eef5fe] hover:border-[#013375] transition disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                title="Documento Anterior"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                disabled={carouselIndex >= filteredArquivos.length - 1}
+                onClick={() => setCarouselIndex((prev) => Math.min(filteredArquivos.length - 1, prev + 1))}
+                className="p-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-[#eef5fe] hover:border-[#013375] transition disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                title="Próximo Documento"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Slide Principal do Carrossel */}
+          {filteredArquivos[carouselIndex] && (() => {
+            const currentDoc = filteredArquivos[carouselIndex];
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+                {/* Capa Grande */}
+                <div
+                  onClick={() => setSelectedFileForDetail(currentDoc)}
+                  className="md:col-span-5 rounded-3xl overflow-hidden border border-slate-200 shadow-md cursor-pointer hover:shadow-xl transition group relative bg-slate-50"
+                >
+                  <div className="h-64 sm:h-72">
+                    {renderCover(currentDoc)}
+                  </div>
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2 text-white font-bold text-xs">
+                    <Eye className="w-4 h-4" /> Clique para abrir visualizador
+                  </div>
+                </div>
+
+                {/* Detalhes agrupados ao lado / abaixo */}
+                <div className="md:col-span-7 space-y-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {currentDoc.is_confidencial && (
+                      <span className="px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase bg-[#910113]/10 text-[#910113] flex items-center gap-1">
+                        <Lock className="w-3.5 h-3.5" /> Confidencial
+                      </span>
+                    )}
+                    <span className="px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase bg-[#013375]/10 text-[#013375]">
+                      v{currentDoc.versao_atual}.0
+                    </span>
+                    <span
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase ${
+                        currentDoc.status === 'aprovado'
+                          ? 'bg-[#2f6746]/10 text-[#2f6746]'
+                          : currentDoc.status === 'rascunho'
+                          ? 'bg-[#f49c0e]/10 text-[#f49c0e]'
+                          : 'bg-slate-200 text-slate-600'
+                      }`}
+                    >
+                      {currentDoc.status}
+                    </span>
+                    <span className="text-xs text-slate-400 font-mono">
+                      {currentDoc.extensao.toUpperCase()} • {formatBytes(currentDoc.tamanho_bytes)}
+                    </span>
+                  </div>
+
+                  <h2
+                    onClick={() => setSelectedFileForDetail(currentDoc)}
+                    className="text-xl sm:text-2xl font-bold text-[#013375] hover:text-[#57a0ff] cursor-pointer transition"
+                  >
+                    {currentDoc.titulo}
+                  </h2>
+
+                  <p className="text-xs text-slate-600 leading-relaxed bg-[#eef5fe]/50 p-4 rounded-2xl border border-slate-200/60">
+                    {currentDoc.descricao || 'Sem resumo executivo cadastrado.'}
+                  </p>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs bg-slate-50 p-4 rounded-2xl border border-slate-200/60">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Categoria</span>
+                      <span className="font-semibold text-slate-800">{currentDoc.categoria_nome || 'Geral'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Autor / Responsável</span>
+                      <span className="font-semibold text-slate-800 truncate block">{currentDoc.autor || 'N/D'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Departamento</span>
+                      <span className="font-semibold text-slate-800 truncate block">{currentDoc.departamento || 'Coordenação'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Ano de Publicação</span>
+                      <span className="font-semibold text-slate-800">{currentDoc.ano_publicacao || 2026}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Cadastrado por</span>
+                      <span className="font-semibold text-slate-800 truncate block">{currentDoc.criador_nome || 'Sistema'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Data de Criação</span>
+                      <span className="font-semibold text-slate-800">{new Date(currentDoc.created_at).toLocaleDateString('pt-BR')}</span>
+                    </div>
+                  </div>
+
+                  {/* Tags */}
+                  {currentDoc.tags && currentDoc.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {currentDoc.tags.map((t) => (
+                        <span key={t} className="text-xs bg-[#eef5fe] text-[#013375] px-3 py-1 rounded-full font-bold">
+                          #{t}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Ações */}
+                  <div className="pt-2 flex items-center gap-3">
+                    <button
+                      onClick={() => setSelectedFileForDetail(currentDoc)}
+                      className="px-5 py-2.5 bg-[#013375] hover:bg-[#57a0ff] hover:text-[#010101] text-white text-xs font-bold rounded-xl transition flex items-center gap-2 cursor-pointer shadow-sm"
+                    >
+                      <Eye className="w-4 h-4" /> Visualizar Documento
+                    </button>
+
+                    <button
+                      onClick={(e) => handleDownload(currentDoc, e)}
+                      disabled={!currentDoc.pode_baixar && user?.role !== 'admin'}
+                      className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
+                    >
+                      <Download className="w-4 h-4" /> Baixar
+                    </button>
+
+                    {user?.role === 'admin' && (
+                      <button
+                        onClick={() => {
+                          setSelectedFileForPermissions(currentDoc);
+                          setIsPermissionsOpen(true);
+                        }}
+                        className="p-2.5 text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer border border-slate-200"
+                        title="Permissões"
+                      >
+                        <Shield className="w-4 h-4 text-[#03889c]" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Miniaturas de Paginação / Carrossel */}
+          {filteredArquivos.length > 1 && (
+            <div className="pt-4 border-t border-slate-100 flex items-center gap-3 overflow-x-auto pb-2">
+              {filteredArquivos.map((arq, idx) => (
+                <button
+                  key={arq.id}
+                  onClick={() => setCarouselIndex(idx)}
+                  className={`shrink-0 w-28 text-left p-2 rounded-2xl border transition cursor-pointer ${
+                    carouselIndex === idx
+                      ? 'border-[#013375] bg-[#eef5fe] shadow-xs'
+                      : 'border-slate-200 hover:border-slate-300 bg-white'
+                  }`}
+                >
+                  <div className="h-14 rounded-lg overflow-hidden mb-1.5 bg-slate-100">
+                    {renderCover(arq)}
+                  </div>
+                  <div className="text-[10px] font-bold text-slate-800 truncate">{arq.titulo}</div>
+                  <div className="text-[9px] text-slate-400 truncate">{arq.extensao.toUpperCase()} • {arq.ano_publicacao || 2026}</div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       ) : viewMode === 'grid' ? (
-        /* VISUALIZAÇÃO EM GRADE */
+        /* VISUALIZAÇÃO EM GRADE (CARDS COM CAPA E INFORMAÇÕES AGRUPADAS ABAIXO) */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredArquivos.map((arq) => (
             <div
               key={arq.id}
               onClick={() => setSelectedFileForDetail(arq)}
-              className="bg-white rounded-3xl p-5 border border-[#013375]/10 hover:border-[#57a0ff] shadow-xs hover:shadow-md transition flex flex-col justify-between group cursor-pointer"
+              className="bg-white rounded-3xl border border-[#013375]/10 hover:border-[#57a0ff] shadow-xs hover:shadow-lg transition flex flex-col justify-between group cursor-pointer overflow-hidden"
             >
               <div>
-                {/* Header do Card */}
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div className="p-3 bg-[#eef5fe] rounded-2xl group-hover:scale-105 transition">
-                    {getMediaIcon(arq.extensao)}
-                  </div>
+                {/* Capa do Documento no Topo do Card */}
+                <div className="relative">
+                  {renderCover(arq)}
 
-                  <div className="flex flex-wrap items-center gap-1.5 justify-end">
+                  {/* Badges Flutuantes sobre a Capa */}
+                  <div className="absolute top-2.5 right-2.5 flex flex-wrap items-center gap-1 justify-end z-10">
                     {arq.is_confidencial && (
-                      <span className="px-2 py-0.5 rounded text-[9px] font-extrabold uppercase bg-[#910113]/10 text-[#910113] flex items-center gap-1">
-                        <Lock className="w-3 h-3" /> Confidencial
+                      <span className="px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase bg-red-600 text-white shadow-xs flex items-center gap-1 backdrop-blur-xs">
+                        <Lock className="w-2.5 h-2.5" /> Confidencial
                       </span>
                     )}
-                    <span className="px-2 py-0.5 rounded text-[9px] font-extrabold uppercase bg-[#013375]/10 text-[#013375]">
+                    <span className="px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase bg-[#013375] text-white shadow-xs">
                       v{arq.versao_atual}.0
                     </span>
                     <span
-                      className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase ${
+                      className={`px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase shadow-xs ${
                         arq.status === 'aprovado'
-                          ? 'bg-[#2f6746]/10 text-[#2f6746]'
+                          ? 'bg-[#2f6746] text-white'
                           : arq.status === 'rascunho'
-                          ? 'bg-[#f49c0e]/10 text-[#f49c0e]'
-                          : 'bg-slate-200 text-slate-600'
+                          ? 'bg-[#f49c0e] text-[#010101]'
+                          : 'bg-slate-600 text-white'
                       }`}
                     >
                       {arq.status}
@@ -480,48 +831,50 @@ export const AcervoView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Título e Metadados */}
-                <h3 className="text-sm font-bold text-[#010101] group-hover:text-[#013375] transition line-clamp-2">
-                  {arq.titulo}
-                </h3>
-                <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">
-                  {arq.descricao || arq.nome_original}
-                </p>
+                {/* Bloco de Informações Agrupadas Abaixo da Capa */}
+                <div className="p-5">
+                  <h3 className="text-sm font-bold text-[#010101] group-hover:text-[#013375] transition line-clamp-2 leading-snug">
+                    {arq.titulo}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">
+                    {arq.descricao || arq.nome_original}
+                  </p>
 
-                <div className="mt-3 pt-3 border-t border-slate-100 space-y-1 text-[11px] text-slate-600 font-medium">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Categoria:</span>
-                    <span className="font-semibold text-slate-700">{arq.categoria_nome || 'Geral'}</span>
+                  <div className="mt-3 pt-3 border-t border-slate-100 space-y-1 text-[11px] text-slate-600 font-medium">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Categoria:</span>
+                      <span className="font-semibold text-slate-700">{arq.categoria_nome || 'Geral'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Autor / Depto:</span>
+                      <span className="truncate max-w-[150px]">{arq.autor || 'N/D'} {arq.departamento ? `• ${arq.departamento}` : ''}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Tamanho / Ano:</span>
+                      <span>{formatBytes(arq.tamanho_bytes)} • {arq.ano_publicacao || '2026'}</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Autor / Depto:</span>
-                    <span className="truncate max-w-[150px]">{arq.autor || 'N/D'} {arq.departamento ? `• ${arq.departamento}` : ''}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Tamanho / Ano:</span>
-                    <span>{formatBytes(arq.tamanho_bytes)} • {arq.ano_publicacao || '2026'}</span>
-                  </div>
+
+                  {/* Tags */}
+                  {arq.tags && arq.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-3">
+                      {arq.tags.slice(0, 3).map((t) => (
+                        <span key={t} className="text-[10px] bg-[#eef5fe] text-[#013375] px-2 py-0.5 rounded-full font-semibold">
+                          #{t}
+                        </span>
+                      ))}
+                      {arq.tags.length > 3 && (
+                        <span className="text-[10px] text-slate-400 self-center">
+                          +{arq.tags.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
-
-                {/* Tags */}
-                {arq.tags && arq.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-3">
-                    {arq.tags.slice(0, 3).map((t) => (
-                      <span key={t} className="text-[10px] bg-[#eef5fe] text-[#013375] px-2 py-0.5 rounded-full font-semibold">
-                        #{t}
-                      </span>
-                    ))}
-                    {arq.tags.length > 3 && (
-                      <span className="text-[10px] text-slate-400 self-center">
-                        +{arq.tags.length - 3}
-                      </span>
-                    )}
-                  </div>
-                )}
               </div>
 
               {/* Ações Rápidas no Rodapé */}
-              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+              <div className="px-5 pb-4 pt-3 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
                 <div className="flex items-center gap-1">
                   <button
                     onClick={(e) => {
