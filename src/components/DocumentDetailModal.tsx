@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { sql } from '@/lib/neon';
 import { indexarDocumentoComIA } from '@/lib/gemini';
+import { downloadFile, fileToDataUrl } from '@/lib/fileUtils';
 import type { Arquivo } from '@/types/arquivo';
 import {
   X,
@@ -231,7 +232,12 @@ export const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({
         INSERT INTO logs_auditoria (usuario_id, arquivo_id, acao, ip_address, user_agent)
         VALUES (${user?.id}::uuid, ${arquivo.id}::uuid, 'download', '192.168.1.10', ${navigator.userAgent});
       `;
-      window.open(arquivo.url_armazenamento, '_blank');
+      downloadFile(arquivo.url_armazenamento, arquivo.nome_original, {
+        titulo: arquivo.titulo,
+        autor: arquivo.autor,
+        departamento: arquivo.departamento,
+        ano: arquivo.ano_publicacao,
+      });
     } catch (e) {
       console.error('Erro ao registrar download:', e);
     }
@@ -244,7 +250,7 @@ export const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({
 
     try {
       const novaVersaoNum = arquivo.versao_atual + 1;
-      const fakeUrl = `https://storage.antigravity.io/rnsmm/v${novaVersaoNum}_${Date.now()}_${encodeURIComponent(file.name)}`;
+      const fakeUrl = await fileToDataUrl(file);
 
       // 1. Inserir na tabela de versões
       await sql`

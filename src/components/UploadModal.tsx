@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { sql } from '@/lib/neon';
 import { indexarDocumentoComIA } from '@/lib/gemini';
+import { fileToDataUrl } from '@/lib/fileUtils';
 import type { Categoria, PermissaoArquivo } from '@/types/arquivo';
 import type { User } from '@/types/auth';
 import {
@@ -51,7 +52,12 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
   // Aba 1: Arquivo & Metadados
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [capaMode, setCapaMode] = useState<'primeira_pagina' | 'custom'>('primeira_pagina');
+  const [capaFile, setCapaFile] = useState<File | null>(null);
+  const [capaPreview, setCapaPreview] = useState<string | null>(null);
+  const capaInputRef = useRef<HTMLInputElement>(null);
   const [titulo, setTitulo] = useState('');
   const [descricao, setDescricao] = useState('');
 
@@ -285,13 +291,16 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
     try {
       const extensao = selectedFile.name.split('.').pop()?.toLowerCase() || 'bin';
-      const fakeStorageUrl = `https://storage.antigravity.io/rnsmm/${Date.now()}_${encodeURIComponent(selectedFile.name)}`;
+      const fakeStorageUrl = await fileToDataUrl(selectedFile);
+      const capaUrl = capaMode === 'custom' && capaFile ? await fileToDataUrl(capaFile) : null;
+
+      await sql`ALTER TABLE arquivos ADD COLUMN IF NOT EXISTS capa_url TEXT;`;
 
       // 1. Inserir arquivo na tabela arquivos
       const insertedRows = await sql`
         INSERT INTO arquivos (
           titulo, descricao, nome_original, tipo_mime, extensao, tamanho_bytes,
-          url_armazenamento, categoria_id, ano_publicacao, autor, departamento,
+          url_armazenamento, capa_url, categoria_id, ano_publicacao, autor, departamento,
           status, tags, versao_atual, is_confidencial, criado_por
         ) VALUES (
           ${titulo.trim()},
@@ -301,6 +310,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           ${extensao},
           ${selectedFile.size},
           ${fakeStorageUrl},
+          ${capaUrl},
           ${categoriaId ? categoriaId : null}::uuid,
           ${anoPublicacao},
           ${autor.trim() || null},
@@ -480,10 +490,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                 </label>
                 <div className="relative border-2 border-dashed border-[#013375]/30 hover:border-[#013375] bg-[#eef5fe]/40 rounded-2xl p-6 text-center transition cursor-pointer group">
                   <input
+                    ref={fileInputRef}
                     type="file"
                     onChange={handleFileChange}
                     accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.svg,.mp4,.mov"
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    className="hidden"
                   />
                   {selectedFile ? (
                     <div className="flex flex-col items-center gap-2">
@@ -511,9 +522,14 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                     </div>
                   ) : (
                     <div className="flex flex-col items-center gap-2 text-slate-500">
-                      <div className="p-3 bg-white rounded-2xl text-[#013375] shadow-xs group-hover:scale-105 transition">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="p-3 bg-white rounded-2xl text-[#013375] shadow-xs group-hover:scale-105 transition cursor-pointer"
+                        title="Selecionar arquivo"
+                      >
                         <Upload className="w-7 h-7" />
-                      </div>
+                      </button>
                       <p className="text-xs font-bold text-slate-700">
                         Arraste e solte o arquivo aqui, ou <span className="text-[#013375] underline">navegue</span>
                       </p>
@@ -523,6 +539,84 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                     </div>
                   )}
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+                  Capa do Arquivo
+                </label>
+                <input
+                  ref={capaInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setCapaFile(file);
+                    setCapaMode('custom');
+                    const reader = new FileReader();
+                    reader.onload = () => setCapaPreview(reader.result as string);
+                    reader.readAsDataURL(file);
+                  }}
+                />
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCapaMode('primeira_pagina');
+                      setCapaFile(null);
+                      setCapaPreview(null);
+                    }}
+                    className={`flex items-center gap-2 p-2.5 rounded-xl border text-left text-xs font-semibold transition cursor-pointer ${
+                      capaMode === 'primeira_pagina'
+                        ? 'border-[#013375] bg-[#eef5fe] text-[#013375]'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                    }`}
+                  >
+                    <FileText className="w-4 h-4 shrink-0" />
+                    <span>Primeira página do documento</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => capaInputRef.current?.click()}
+                    className={`flex items-center gap-2 p-2.5 rounded-xl border text-left text-xs font-semibold transition cursor-pointer ${
+                      capaMode === 'custom' && capaFile
+                        ? 'border-[#013375] bg-[#eef5fe] text-[#013375]'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                    }`}
+                  >
+                    <FileImage className="w-4 h-4 shrink-0" />
+                    <span className="truncate">
+                      {capaMode === 'custom' && capaFile
+                        ? capaFile.name
+                        : 'Subir capa do dispositivo'}
+                    </span>
+                  </button>
+                </div>
+
+                {capaMode === 'custom' && capaPreview && (
+                  <div className="mt-2 flex items-center gap-3 p-2 bg-slate-50 rounded-xl border border-slate-200">
+                    <img
+                      src={capaPreview}
+                      alt="Prévia da capa"
+                      className="w-10 h-12 object-cover rounded-md border border-slate-200"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-slate-700 truncate">
+                        {capaFile?.name}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => capaInputRef.current?.click()}
+                        className="text-[11px] text-[#013375] underline font-semibold cursor-pointer"
+                      >
+                        Trocar imagem
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>

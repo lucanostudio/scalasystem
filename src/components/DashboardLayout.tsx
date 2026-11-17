@@ -10,7 +10,9 @@ import {
   FolderTree,
   UserCheck,
   Search,
-  Bell
+  Bell,
+  Briefcase,
+  Megaphone
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -33,8 +35,18 @@ export const DashboardLayout: React.FC<LayoutProps> = ({
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'acervo', label: 'Acervo Digital', icon: FolderArchive },
-    { id: 'categorias', label: 'Categorias / Pastas', icon: FolderTree },
-    { id: 'lixeira', label: 'Lixeira', icon: Trash2 },
+    ...(user?.role === 'colaborador' || user?.role === 'editor' || user?.role === 'admin'
+      ? [
+          { id: 'colaborador', label: 'Área do Colaborador', icon: Briefcase },
+          { id: 'comunicados', label: 'Comunicados', icon: Megaphone },
+        ]
+      : []),
+    ...(user?.role === 'editor' || user?.role === 'admin'
+      ? [
+          { id: 'categorias', label: 'Categorias / Pastas', icon: FolderTree },
+          { id: 'lixeira', label: 'Lixeira', icon: Trash2 },
+        ]
+      : []),
     ...(user?.role === 'admin'
       ? [
           { id: 'usuarios', label: 'Usuários & Perfis', icon: Users },

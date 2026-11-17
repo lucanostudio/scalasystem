@@ -86,7 +86,7 @@ export const UsersManagementPage: React.FC = () => {
             <Users className="w-7 h-7 text-blue-500" /> Gestão de Usuários e Perfis (RBAC)
           </h1>
           <p className="text-sm text-slate-400 mt-1">
-            Controle de acessos, papéis (*Admin*, *Editor*, *Leitor*) e permissões de segurança.
+            Controle de acessos, papéis (*Admin*, *Editor*, *Colaborador*, *Leitor*) e permissões de segurança.
           </p>
         </div>
 
@@ -115,7 +115,7 @@ export const UsersManagementPage: React.FC = () => {
 
         <div className="flex items-center gap-3 w-full md:w-auto">
           <div className="flex items-center gap-1 bg-slate-950 p-1 border border-slate-800 rounded-lg">
-            {(['all', 'admin', 'editor', 'leitor'] as const).map((r) => (
+            {(['all', 'admin', 'editor', 'colaborador', 'leitor'] as const).map((r) => (
               <button
                 key={r}
                 onClick={() => setRoleFilter(r)}
@@ -198,6 +198,7 @@ export const UsersManagementPage: React.FC = () => {
                         >
                           <option value="admin">Administrador</option>
                           <option value="editor">Editor</option>
+                          <option value="colaborador">Colaborador</option>
                           <option value="leitor">Leitor</option>
                         </select>
                       ) : (
@@ -315,7 +316,8 @@ export const UsersManagementPage: React.FC = () => {
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-white text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer"
                 >
                   <option value="leitor">Leitor (Apenas visualização e download autorizado)</option>
-                  <option value="editor">Editor (Upload e gerenciamento de arquivos)</option>
+                  <option value="colaborador">Colaborador (Acervo + Área do Colaborador + Comunicados)</option>
+                  <option value="editor">Editor (Upload, gerenciamento de arquivos, links e comunicados)</option>
                   <option value="admin">Administrador (Controle irrestrito e auditoria)</option>
                 </select>
               </div>

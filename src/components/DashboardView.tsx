@@ -17,7 +17,9 @@ import {
   ArrowRight,
   RefreshCw,
   Sparkles,
-  ExternalLink
+  ExternalLink,
+  Briefcase,
+  Megaphone
 } from 'lucide-react';
 
 interface DashboardStats {
@@ -50,10 +52,17 @@ interface ActivityLog {
 
 interface DashboardViewProps {
   onNavigateToAcervo: () => void;
+  onNavigateToColaborador?: () => void;
+  onNavigateToComunicados?: () => void;
   onSelectFile?: (fileId: string) => void;
 }
 
-export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateToAcervo, onSelectFile }) => {
+export const DashboardView: React.FC<DashboardViewProps> = ({
+  onNavigateToAcervo,
+  onNavigateToColaborador,
+  onNavigateToComunicados,
+  onSelectFile
+}) => {
   const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
     totalArquivos: 0,
@@ -63,6 +72,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateToAcervo
   });
   const [popularFiles, setPopularFiles] = useState<PopularFile[]>([]);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   // Modal de Detalhes Rápido
@@ -200,6 +210,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateToAcervo
         created_at: r.created_at,
       })));
 
+      // 4. Comunicados não lidos (para Colaborador, Editor e Admin)
+      if (user.role !== 'leitor') {
+        try {
+          const unreadRows = await sql`
+            SELECT COUNT(*)::int AS count
+            FROM announcements a
+            WHERE NOT EXISTS (
+              SELECT 1 FROM announcement_reads ar
+              WHERE ar.announcement_id = a.id AND ar.usuario_id = ${user.id}::uuid
+            );
+          `;
+          setUnreadCount(unreadRows[0]?.count || 0);
+        } catch {
+          setUnreadCount(0);
+        }
+      }
     } catch (err) {
       console.error('Erro ao carregar métricas do dashboard:', err);
     } finally {
@@ -246,8 +272,78 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateToAcervo
     }
   };
 
+  const isLeitor = user?.role === 'leitor';
+  const canAccessColaborador = user?.role === 'colaborador' || user?.role === 'editor' || user?.role === 'admin';
+
   return (
     <div className="space-y-8 font-['Montserrat']">
+      {/* Botões de Acesso Rápido (Desacoplados da Barra de Busca Global) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <button
+          onClick={onNavigateToAcervo}
+          className="group bg-white border border-[#013375]/10 hover:border-[#57a0ff] rounded-2xl p-5 flex items-center justify-between shadow-xs hover:shadow-md transition cursor-pointer text-left"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-[#013375] text-white flex items-center justify-center shadow-sm">
+              <FolderArchive className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-sm font-extrabold text-[#013375]">Acervo Digital</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Consulta e download de documentos</p>
+            </div>
+          </div>
+          <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-[#013375] group-hover:translate-x-1 transition" />
+        </button>
+
+        {canAccessColaborador && onNavigateToColaborador && (
+          <button
+            onClick={onNavigateToColaborador}
+            className="group bg-white border border-[#013375]/10 hover:border-[#57a0ff] rounded-2xl p-5 flex items-center justify-between shadow-xs hover:shadow-md transition cursor-pointer text-left"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-[#2f6746] text-white flex items-center justify-center shadow-sm">
+                <Briefcase className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-sm font-extrabold text-[#013375]">Área do Colaborador</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Ponto, holerites, benefícios e RH</p>
+              </div>
+            </div>
+            <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-[#013375] group-hover:translate-x-1 transition" />
+          </button>
+        )}
+
+        {canAccessColaborador && onNavigateToComunicados && (
+          <button
+            onClick={onNavigateToComunicados}
+            className="group bg-white border border-[#013375]/10 hover:border-[#57a0ff] rounded-2xl p-5 flex items-center justify-between shadow-xs hover:shadow-md transition cursor-pointer text-left relative"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-[#03889c] text-white flex items-center justify-center shadow-sm relative">
+                <Megaphone className="w-6 h-6" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1.5 rounded-full bg-[#f49c0e] text-white text-[10px] font-extrabold flex items-center justify-center shadow">
+                    {unreadCount}
+                  </span>
+                )}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-extrabold text-[#013375]">Comunicados</h3>
+                  {unreadCount > 0 && (
+                    <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-[#f49c0e]/15 text-[#f49c0e]">
+                      {unreadCount} novo{unreadCount > 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">Avisos internos e atualizações</p>
+              </div>
+            </div>
+            <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-[#013375] group-hover:translate-x-1 transition" />
+          </button>
+        )}
+      </div>
+
       {/* Banner de Boas-vindas Scalasystem */}
       <div className="bg-gradient-to-r from-[#013375] via-[#002557] to-[#010101] rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
         <div className="absolute right-0 top-0 bottom-0 w-1/3 opacity-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white to-transparent pointer-events-none" />
@@ -283,205 +379,210 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateToAcervo
         </div>
       </div>
 
-      {/* Cards de Métricas Principais (4 Cards) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {/* Card 1: Total de Arquivos */}
-        <div className="bg-white rounded-2xl p-5 border border-[#013375]/10 shadow-sm hover:shadow-md transition">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Acervo Acessível</span>
-            <div className="p-2.5 bg-[#013375]/10 text-[#013375] rounded-xl">
-              <FolderArchive className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="text-3xl font-extrabold text-[#013375]">
-            {loading ? '...' : stats.totalArquivos}
-          </div>
-          <p className="text-xs text-slate-500 mt-1 flex items-center gap-1 font-medium">
-            <HardDrive className="w-3.5 h-3.5 text-[#03889c]" />
-            {user?.role === 'admin'
-              ? `Volume total: ${formatBytes(stats.totalBytes)}`
-              : 'Arquivos autorizados para você'}
-          </p>
-        </div>
-
-        {/* Card 2: Downloads na Semana */}
-        <div className="bg-white rounded-2xl p-5 border border-[#013375]/10 shadow-sm hover:shadow-md transition">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Downloads (Semana)</span>
-            <div className="p-2.5 bg-[#2f6746]/10 text-[#2f6746] rounded-xl">
-              <Download className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="text-3xl font-extrabold text-[#2f6746]">
-            {loading ? '...' : stats.downloadsSemana}
-          </div>
-          <p className="text-xs text-slate-500 mt-1 flex items-center gap-1 font-medium">
-            <TrendingUp className="w-3.5 h-3.5 text-[#2f6746]" />
-            Downloads nos últimos 7 dias
-          </p>
-        </div>
-
-        {/* Card 3: Visualizações na Semana */}
-        <div className="bg-white rounded-2xl p-5 border border-[#013375]/10 shadow-sm hover:shadow-md transition">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Acessos & Prévias</span>
-            <div className="p-2.5 bg-[#03889c]/10 text-[#03889c] rounded-xl">
-              <Eye className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="text-3xl font-extrabold text-[#03889c]">
-            {loading ? '...' : stats.visualizacoesSemana}
-          </div>
-          <p className="text-xs text-slate-500 mt-1 flex items-center gap-1 font-medium">
-            <Clock className="w-3.5 h-3.5 text-[#03889c]" />
-            Visualizações nos últimos 7 dias
-          </p>
-        </div>
-
-        {/* Card 4: Segurança & Perfil RBAC */}
-        <div className="bg-white rounded-2xl p-5 border border-[#013375]/10 shadow-sm hover:shadow-md transition">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Privilégio Atual</span>
-            <div className="p-2.5 bg-[#910113]/10 text-[#910113] rounded-xl">
-              <ShieldCheck className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="text-2xl font-extrabold uppercase text-[#910113]">
-            {user?.role}
-          </div>
-          <p className="text-xs text-slate-500 mt-1 flex items-center gap-1 font-medium">
-            <ShieldAlert className="w-3.5 h-3.5 text-[#f49c0e]" />
-            {user?.role === 'admin' ? 'Acesso irrestrito a logs e dados' : 'Acesso controlado por RLS'}
-          </p>
-        </div>
-      </div>
-
-      {/* Grid Principal: Arquivos Mais Populares & Feed de Atividades */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Ranking de Documentos Mais Acessados (2 Colunas) */}
-        <div className="lg:col-span-2 bg-white rounded-3xl p-6 border border-[#013375]/10 shadow-sm space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[#013375]/10">
-            <div>
-              <h2 className="text-base font-extrabold text-[#013375] flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-[#57a0ff]" /> Documentos Mais Acessados
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Ranking de documentos com maior número de consultas e downloads.
+      {/* Para perfis de Administrador e Editor, exibe métricas, ranking e atividades. Para Leitor e Colaborador, exibe apenas a mensagem de boas-vindas e ações */}
+      {(user?.role === 'admin' || user?.role === 'editor') && (
+        <>
+          {/* Cards de Métricas Principais (4 Cards) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {/* Card 1: Total de Arquivos */}
+            <div className="bg-white rounded-2xl p-5 border border-[#013375]/10 shadow-sm hover:shadow-md transition">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Acervo Acessível</span>
+                <div className="p-2.5 bg-[#013375]/10 text-[#013375] rounded-xl">
+                  <FolderArchive className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="text-3xl font-extrabold text-[#013375]">
+                {loading ? '...' : stats.totalArquivos}
+              </div>
+              <p className="text-xs text-slate-500 mt-1 flex items-center gap-1 font-medium">
+                <HardDrive className="w-3.5 h-3.5 text-[#03889c]" />
+                {user?.role === 'admin'
+                  ? `Volume total: ${formatBytes(stats.totalBytes)}`
+                  : 'Arquivos autorizados para você'}
               </p>
             </div>
 
-            <button
-              onClick={onNavigateToAcervo}
-              className="text-xs font-bold text-[#013375] hover:text-[#57a0ff] flex items-center gap-1 transition cursor-pointer"
-            >
-              <span>Ver todos</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            {loading ? (
-              <div className="py-12 text-center text-slate-400 text-sm flex items-center justify-center gap-2">
-                <RefreshCw className="w-4 h-4 animate-spin text-[#013375]" /> Carregando acervo do Neon...
-              </div>
-            ) : popularFiles.length === 0 ? (
-              <div className="py-10 text-center text-slate-400 text-xs">
-                Nenhum arquivo acessado recentemente.
-              </div>
-            ) : (
-              popularFiles.map((doc, idx) => (
-                <div
-                  key={doc.id}
-                  onClick={() => setSelectedFileDetail(doc)}
-                  className="p-4 rounded-2xl bg-[#eef5fe]/60 hover:bg-[#eef5fe] border border-[#013375]/10 hover:border-[#57a0ff] transition cursor-pointer flex items-center justify-between gap-4 group"
-                >
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    <div className="w-7 h-7 rounded-lg bg-white font-extrabold text-xs text-[#013375] flex items-center justify-center shadow-xs shrink-0">
-                      #{idx + 1}
-                    </div>
-
-                    <div className="p-2.5 bg-white rounded-xl shadow-xs shrink-0">
-                      {getFileIcon(doc.extensao)}
-                    </div>
-
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-xs sm:text-sm font-bold text-[#010101] group-hover:text-[#013375] transition truncate">
-                          {doc.titulo}
-                        </h3>
-                        {doc.is_confidencial && (
-                          <span className="px-2 py-0.5 rounded text-[9px] font-extrabold uppercase bg-[#910113]/10 text-[#910113] shrink-0">
-                            Confidencial
-                          </span>
-                        )}
-                        <span className="text-[10px] text-slate-500 font-semibold shrink-0">
-                          v{doc.versao_atual}.0
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                        {doc.categoria_nome || 'Geral'} • {doc.nome_original}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-4 shrink-0 text-xs text-slate-600">
-                    <div className="flex items-center gap-1.5" title="Downloads">
-                      <Download className="w-3.5 h-3.5 text-[#2f6746]" />
-                      <span className="font-bold">{doc.downloads_count}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5" title="Visualizações">
-                      <Eye className="w-3.5 h-3.5 text-[#03889c]" />
-                      <span className="font-bold">{doc.visualizacoes_count}</span>
-                    </div>
-                    <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-[#013375] transition" />
-                  </div>
+            {/* Card 2: Downloads na Semana */}
+            <div className="bg-white rounded-2xl p-5 border border-[#013375]/10 shadow-sm hover:shadow-md transition">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Downloads (Semana)</span>
+                <div className="p-2.5 bg-[#2f6746]/10 text-[#2f6746] rounded-xl">
+                  <Download className="w-5 h-5" />
                 </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Feed de Atividades Recentes (1 Coluna) */}
-        <div className="bg-white rounded-3xl p-6 border border-[#013375]/10 shadow-sm space-y-4">
-          <div className="pb-3 border-b border-[#013375]/10">
-            <h2 className="text-base font-extrabold text-[#013375] flex items-center gap-2">
-              <Clock className="w-5 h-5 text-[#f49c0e]" /> Atividades Recentes
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Auditoria em tempo real de downloads e acessos.
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            {loading ? (
-              <div className="py-10 text-center text-slate-400 text-xs">
-                Carregando registros...
               </div>
-            ) : activities.length === 0 ? (
-              <div className="py-10 text-center text-slate-400 text-xs font-medium">
-                Nenhuma atividade recente registrada no momento.
+              <div className="text-3xl font-extrabold text-[#2f6746]">
+                {loading ? '...' : stats.downloadsSemana}
               </div>
-            ) : (
-              activities.map((act) => (
-                <div key={act.id} className="p-3 bg-[#eef5fe]/50 rounded-xl border border-[#013375]/5 text-xs space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-[#013375]">{act.usuario_nome}</span>
-                    {getActionBadge(act.acao)}
-                  </div>
-                  {act.arquivo_titulo && (
-                    <p className="text-[11px] text-slate-700 font-medium truncate">
-                      {act.arquivo_titulo}
-                    </p>
-                  )}
-                  <p className="text-[10px] text-slate-400">
-                    {new Date(act.created_at).toLocaleString('pt-BR')}
+              <p className="text-xs text-slate-500 mt-1 flex items-center gap-1 font-medium">
+                <TrendingUp className="w-3.5 h-3.5 text-[#2f6746]" />
+                Downloads nos últimos 7 dias
+              </p>
+            </div>
+
+            {/* Card 3: Visualizações na Semana */}
+            <div className="bg-white rounded-2xl p-5 border border-[#013375]/10 shadow-sm hover:shadow-md transition">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Acessos & Prévias</span>
+                <div className="p-2.5 bg-[#03889c]/10 text-[#03889c] rounded-xl">
+                  <Eye className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="text-3xl font-extrabold text-[#03889c]">
+                {loading ? '...' : stats.visualizacoesSemana}
+              </div>
+              <p className="text-xs text-slate-500 mt-1 flex items-center gap-1 font-medium">
+                <Clock className="w-3.5 h-3.5 text-[#03889c]" />
+                Visualizações nos últimos 7 dias
+              </p>
+            </div>
+
+            {/* Card 4: Segurança & Perfil RBAC */}
+            <div className="bg-white rounded-2xl p-5 border border-[#013375]/10 shadow-sm hover:shadow-md transition">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Privilégio Atual</span>
+                <div className="p-2.5 bg-[#910113]/10 text-[#910113] rounded-xl">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="text-2xl font-extrabold uppercase text-[#910113]">
+                {user?.role}
+              </div>
+              <p className="text-xs text-slate-500 mt-1 flex items-center gap-1 font-medium">
+                <ShieldAlert className="w-3.5 h-3.5 text-[#f49c0e]" />
+                {user?.role === 'admin' ? 'Acesso irrestrito a logs e dados' : 'Acesso controlado por RLS'}
+              </p>
+            </div>
+          </div>
+
+          {/* Grid Principal: Arquivos Mais Populares & Feed de Atividades */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Ranking de Documentos Mais Acessados (2 Colunas) */}
+            <div className="lg:col-span-2 bg-white rounded-3xl p-6 border border-[#013375]/10 shadow-sm space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-[#013375]/10">
+                <div>
+                  <h2 className="text-base font-extrabold text-[#013375] flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-[#57a0ff]" /> Documentos Mais Acessados
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Ranking de documentos com maior número de consultas e downloads.
                   </p>
                 </div>
-              ))
-            )}
+
+                <button
+                  onClick={onNavigateToAcervo}
+                  className="text-xs font-bold text-[#013375] hover:text-[#57a0ff] flex items-center gap-1 transition cursor-pointer"
+                >
+                  <span>Ver todos</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {loading ? (
+                  <div className="py-12 text-center text-slate-400 text-sm flex items-center justify-center gap-2">
+                    <RefreshCw className="w-4 h-4 animate-spin text-[#013375]" /> Carregando acervo do Neon...
+                  </div>
+                ) : popularFiles.length === 0 ? (
+                  <div className="py-10 text-center text-slate-400 text-xs">
+                    Nenhum arquivo acessado recentemente.
+                  </div>
+                ) : (
+                  popularFiles.map((doc, idx) => (
+                    <div
+                      key={doc.id}
+                      onClick={() => setSelectedFileDetail(doc)}
+                      className="p-4 rounded-2xl bg-[#eef5fe]/60 hover:bg-[#eef5fe] border border-[#013375]/10 hover:border-[#57a0ff] transition cursor-pointer flex items-center justify-between gap-4 group"
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <div className="w-7 h-7 rounded-lg bg-white font-extrabold text-xs text-[#013375] flex items-center justify-center shadow-xs shrink-0">
+                          #{idx + 1}
+                        </div>
+
+                        <div className="p-2.5 bg-white rounded-xl shadow-xs shrink-0">
+                          {getFileIcon(doc.extensao)}
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-xs sm:text-sm font-bold text-[#010101] group-hover:text-[#013375] transition truncate">
+                              {doc.titulo}
+                            </h3>
+                            {doc.is_confidencial && (
+                              <span className="px-2 py-0.5 rounded text-[9px] font-extrabold uppercase bg-[#910113]/10 text-[#910113] shrink-0">
+                                Confidencial
+                              </span>
+                            )}
+                            <span className="text-[10px] text-slate-500 font-semibold shrink-0">
+                              v{doc.versao_atual}.0
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                            {doc.categoria_nome || 'Geral'} • {doc.nome_original}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4 shrink-0 text-xs text-slate-600">
+                        <div className="flex items-center gap-1.5" title="Downloads">
+                          <Download className="w-3.5 h-3.5 text-[#2f6746]" />
+                          <span className="font-bold">{doc.downloads_count}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5" title="Visualizações">
+                          <Eye className="w-3.5 h-3.5 text-[#03889c]" />
+                          <span className="font-bold">{doc.visualizacoes_count}</span>
+                        </div>
+                        <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-[#013375] transition" />
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Feed de Atividades Recentes (1 Coluna) */}
+            <div className="bg-white rounded-3xl p-6 border border-[#013375]/10 shadow-sm space-y-4">
+              <div className="pb-3 border-b border-[#013375]/10">
+                <h2 className="text-base font-extrabold text-[#013375] flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-[#f49c0e]" /> Atividades Recentes
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Auditoria em tempo real de downloads e acessos.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {loading ? (
+                  <div className="py-10 text-center text-slate-400 text-xs">
+                    Carregando registros...
+                  </div>
+                ) : activities.length === 0 ? (
+                  <div className="py-10 text-center text-slate-400 text-xs font-medium">
+                    Nenhuma atividade recente registrada no momento.
+                  </div>
+                ) : (
+                  activities.map((act) => (
+                    <div key={act.id} className="p-3 bg-[#eef5fe]/50 rounded-xl border border-[#013375]/5 text-xs space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-[#013375]">{act.usuario_nome}</span>
+                        {getActionBadge(act.acao)}
+                      </div>
+                      {act.arquivo_titulo && (
+                        <p className="text-[11px] text-slate-700 font-medium truncate">
+                          {act.arquivo_titulo}
+                        </p>
+                      )}
+                      <p className="text-[10px] text-slate-400">
+                        {new Date(act.created_at).toLocaleString('pt-BR')}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </>
+      )}
 
       {/* Modal de Detalhes do Documento */}
       {selectedFileDetail && (

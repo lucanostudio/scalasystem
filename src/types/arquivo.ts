@@ -13,6 +13,7 @@ export interface Arquivo {
   extensao: string;
   tamanho_bytes: number;
   url_armazenamento: string;
+  capa_url?: string | null;
   categoria_id?: string;
   categoria_nome?: string;
   ano_publicacao?: number;

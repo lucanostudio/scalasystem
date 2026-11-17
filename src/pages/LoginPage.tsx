@@ -166,7 +166,7 @@ export const LoginPage: React.FC = () => {
             <p className="font-bold text-[#eef5fe] mb-2.5 flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-[#57a0ff]" /> Acessos Rápidos de Demonstração (RBAC):
             </p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <button
                 type="button"
                 onClick={() => handleFillDemo('admin@antigravity.io', 'Admin@2026')}
@@ -180,6 +180,13 @@ export const LoginPage: React.FC = () => {
                 className="py-2 px-2 bg-[#03889c] hover:bg-[#026c7c] text-white border border-white/20 rounded-xl transition text-center font-bold text-[11px] shadow-sm cursor-pointer"
               >
                 Editor
+              </button>
+              <button
+                type="button"
+                onClick={() => handleFillDemo('lucas.colaborador@antigravity.io', 'Colaborador@2026')}
+                className="py-2 px-2 bg-[#f49c0e] hover:bg-[#d9890b] text-[#010101] border border-white/20 rounded-xl transition text-center font-bold text-[11px] shadow-sm cursor-pointer"
+              >
+                Colaborador
               </button>
               <button
                 type="button"

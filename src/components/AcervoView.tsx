@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { sql } from '@/lib/neon';
+import { downloadFile } from '@/lib/fileUtils';
 import type { Arquivo, Categoria } from '@/types/arquivo';
 import { UploadModal } from './UploadModal';
 import { PermissionsModal } from './PermissionsModal';
@@ -35,7 +36,8 @@ import {
   ChevronRight,
   GalleryHorizontal,
   Film,
-  Camera
+  Camera,
+  BookOpen
 } from 'lucide-react';
 
 export const AcervoView: React.FC = () => {
@@ -43,7 +45,7 @@ export const AcervoView: React.FC = () => {
   const [arquivos, setArquivos] = useState<Arquivo[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'grid' | 'table' | 'carousel'>('grid');
+  const [viewMode, setViewMode] = useState<'banca' | 'grid' | 'carousel' | 'table'>('banca');
   const [carouselIndex, setCarouselIndex] = useState(0);
 
   // Filtros Avançados & Drawer
@@ -124,6 +126,7 @@ export const AcervoView: React.FC = () => {
         extensao: r.extensao,
         tamanho_bytes: Number(r.tamanho_bytes),
         url_armazenamento: r.url_armazenamento,
+        capa_url: r.capa_url || null,
         categoria_id: r.categoria_id,
         categoria_nome: r.categoria_nome,
         ano_publicacao: r.ano_publicacao,
@@ -188,7 +191,12 @@ export const AcervoView: React.FC = () => {
         VALUES (${user?.id}::uuid, ${arquivo.id}::uuid, 'download', '192.168.1.10', ${navigator.userAgent});
       `;
       showToast(`Download de "${arquivo.titulo}" registrado.`);
-      window.open(arquivo.url_armazenamento, '_blank');
+      downloadFile(arquivo.url_armazenamento, arquivo.nome_original, {
+        titulo: arquivo.titulo,
+        autor: arquivo.autor,
+        departamento: arquivo.departamento,
+        ano: arquivo.ano_publicacao,
+      });
     } catch (e) {
       console.error('Erro ao registrar log de download:', e);
     }
@@ -307,6 +315,94 @@ export const AcervoView: React.FC = () => {
     return matchesSearch && matchesCat && matchesDepto && matchesTipo && matchesStatus && matchesAno && matchesTags;
   });
 
+  const renderPublicationCover = (arq: Arquivo) => {
+    if (arq.capa_url) {
+      return (
+        <img
+          src={arq.capa_url}
+          alt={arq.titulo}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = '/covers/cover_mag1.jpg';
+          }}
+        />
+      );
+    }
+
+    const ext = arq.extensao.toLowerCase();
+    const isImage = ['png', 'jpg', 'jpeg', 'svg'].includes(ext);
+    const isPdf = ext === 'pdf';
+    const hasRealFile =
+      Boolean(arq.url_armazenamento) &&
+      !arq.url_armazenamento.includes('storage.antigravity.io') &&
+      !arq.url_armazenamento.includes('fake');
+
+    if (isImage && hasRealFile) {
+      return (
+        <img
+          src={arq.url_armazenamento}
+          alt={arq.titulo}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = '/covers/cover_mag1.jpg';
+          }}
+        />
+      );
+    }
+
+    if (isPdf && hasRealFile) {
+      return (
+        <iframe
+          src={`${arq.url_armazenamento}#page=1&toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+          title={arq.titulo}
+          className="w-full h-full border-0 pointer-events-none bg-white"
+        />
+      );
+    }
+
+    return (
+      <div className="w-full h-full bg-white text-slate-800 p-3 flex flex-col justify-between select-none">
+        <div>
+          <div className="flex items-center justify-between border-b border-slate-200 pb-1.5 mb-2">
+            <span className="text-[8px] font-bold text-[#013375] truncate">
+              Scalasystem - RNSMM
+            </span>
+            <span className="text-[7px] font-mono uppercase text-slate-400 shrink-0">
+              {ext} • v{arq.versao_atual}.0
+            </span>
+          </div>
+
+          <h4 className="text-[11px] font-bold text-slate-900 leading-tight line-clamp-2 mb-1">
+            {arq.titulo}
+          </h4>
+
+          {arq.descricao && (
+            <p className="text-[8px] text-slate-500 leading-snug line-clamp-2 mb-2">
+              {arq.descricao}
+            </p>
+          )}
+
+          <div className="bg-slate-50 border border-slate-200/80 rounded p-1.5 space-y-0.5 text-[7px] text-slate-600">
+            <p className="truncate">
+              <strong className="text-slate-700">Autor:</strong> {arq.autor || '—'}
+            </p>
+            <p className="truncate">
+              <strong className="text-slate-700">Depto:</strong> {arq.departamento || '—'}
+            </p>
+            <p className="truncate">
+              <strong className="text-slate-700">Ano:</strong> {arq.ano_publicacao || 2026}
+            </p>
+          </div>
+        </div>
+
+        <div className="border-t border-slate-100 pt-1 flex items-center justify-between text-[7px] text-slate-400">
+          <span className="truncate">Governança Scalabriniana</span>
+          <span className="shrink-0">Pág. 1</span>
+        </div>
+      </div>
+    );
+  };
+
   const renderCover = (arq: Arquivo) => {
     const isImage = ['png', 'jpg', 'jpeg', 'svg'].includes(arq.extensao.toLowerCase());
     const isVideo = ['mp4', 'mov'].includes(arq.extensao.toLowerCase());
@@ -409,6 +505,18 @@ export const AcervoView: React.FC = () => {
 
           <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 shadow-xs">
             <button
+              onClick={() => setViewMode('banca')}
+              title="Visualização em Banca de Publicações"
+              className={`p-2 rounded-lg transition cursor-pointer flex items-center gap-1.5 text-xs font-bold ${
+                viewMode === 'banca'
+                  ? 'bg-[#013375] text-white shadow-xs'
+                  : 'text-slate-400 hover:text-slate-700'
+              }`}
+            >
+              <BookOpen className="w-4 h-4" />
+              <span className="hidden sm:inline">Banca</span>
+            </button>
+            <button
               onClick={() => setViewMode('grid')}
               title="Visualização em Cards"
               className={`p-2 rounded-lg transition cursor-pointer flex items-center gap-1.5 text-xs font-bold ${
@@ -451,8 +559,8 @@ export const AcervoView: React.FC = () => {
         </div>
       </div>
 
-      {/* Barra de Busca Textual (Full-Text Search) & Botões de Categorias Mais Buscadas */}
-      <div className="bg-white rounded-3xl p-4 border border-[#013375]/10 shadow-xs space-y-3">
+      {/* Barra de Busca Textual (Full-Text Search) */}
+      <div className="bg-white rounded-3xl p-4 border border-[#013375]/10 shadow-xs">
         <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
           <div className="relative w-full md:flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -495,12 +603,26 @@ export const AcervoView: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Botões das Categorias / Tipos Mais Buscados */}
-        <div className="pt-2 border-t border-slate-100 flex items-center gap-2 flex-wrap">
+      {/* Seção Separada: Botões de Filtros Rápidos (Documentos / Fotografias / Vídeos / Categorias) */}
+      <div className="bg-white rounded-2xl p-3 sm:p-4 border border-[#013375]/10 shadow-xs flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mr-1">
-            <Tag className="w-3.5 h-3.5 text-[#57a0ff]" /> Mais Buscados:
+            <Tag className="w-3.5 h-3.5 text-[#57a0ff]" /> Filtrar por Tipo:
           </span>
+
+          <button
+            type="button"
+            onClick={() => setSelectedTipo('all')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+              selectedTipo === 'all'
+                ? 'bg-[#013375] text-white shadow-xs'
+                : 'bg-[#eef5fe] text-slate-700 hover:bg-[#013375]/10'
+            }`}
+          >
+            Tudo
+          </button>
 
           <button
             type="button"
@@ -511,14 +633,14 @@ export const AcervoView: React.FC = () => {
                 setSelectedTipo('doc');
               }
             }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
               selectedTipo === 'doc' || selectedTipo === 'pdf'
                 ? 'bg-[#013375] text-white shadow-xs'
                 : 'bg-[#eef5fe] text-[#013375] hover:bg-[#013375]/10'
             }`}
           >
             <FileText className="w-3.5 h-3.5" />
-            <span>Documentos Oficiais</span>
+            <span>Documentos</span>
             {(selectedTipo === 'doc' || selectedTipo === 'pdf') && <CheckCircle2 className="w-3 h-3" />}
           </button>
 
@@ -527,14 +649,14 @@ export const AcervoView: React.FC = () => {
             onClick={() => {
               setSelectedTipo(selectedTipo === 'imagem' ? 'all' : 'imagem');
             }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
               selectedTipo === 'imagem'
                 ? 'bg-[#03889c] text-white shadow-xs'
                 : 'bg-[#eef5fe] text-[#03889c] hover:bg-[#03889c]/10'
             }`}
           >
             <Camera className="w-3.5 h-3.5" />
-            <span>Fotografias</span>
+            <span>Fotos</span>
             {selectedTipo === 'imagem' && <CheckCircle2 className="w-3 h-3" />}
           </button>
 
@@ -543,7 +665,7 @@ export const AcervoView: React.FC = () => {
             onClick={() => {
               setSelectedTipo(selectedTipo === 'video' ? 'all' : 'video');
             }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
               selectedTipo === 'video'
                 ? 'bg-[#ff8b00] text-white shadow-xs'
                 : 'bg-[#eef5fe] text-[#ff8b00] hover:bg-[#ff8b00]/10'
@@ -553,17 +675,41 @@ export const AcervoView: React.FC = () => {
             <span>Vídeos</span>
             {selectedTipo === 'video' && <CheckCircle2 className="w-3 h-3" />}
           </button>
+        </div>
 
-          {selectedTipo !== 'all' && (
+        {/* Categorias em pílulas horizontais estilo banca */}
+        {categorias.length > 0 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto max-w-full py-1">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1 shrink-0">
+              Categorias:
+            </span>
             <button
               type="button"
-              onClick={() => setSelectedTipo('all')}
-              className="text-[11px] text-slate-400 hover:text-[#910113] font-semibold underline cursor-pointer ml-1"
+              onClick={() => setSelectedCategoria('all')}
+              className={`px-3 py-1 rounded-lg text-xs font-semibold shrink-0 cursor-pointer transition ${
+                selectedCategoria === 'all'
+                  ? 'bg-slate-800 text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
             >
-              Ver todos os tipos
+              Todas
             </button>
-          )}
-        </div>
+            {categorias.slice(0, 6).map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setSelectedCategoria(selectedCategoria === cat.id ? 'all' : cat.id)}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold shrink-0 cursor-pointer transition ${
+                  selectedCategoria === cat.id
+                    ? 'bg-[#013375] text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {cat.nome}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Tags Selecionadas Ativas */}
@@ -601,6 +747,76 @@ export const AcervoView: React.FC = () => {
           >
             Limpar Todos os Filtros
           </button>
+        </div>
+      ) : viewMode === 'banca' ? (
+        /* VISUALIZAÇÃO EM BANCA DE PUBLICAÇÕES (Estante de Madeira / Livraria) */
+        <div className="rounded-3xl p-6 sm:p-10 shadow-2xl border border-amber-950/20 relative overflow-hidden"
+             style={{
+               background: 'linear-gradient(to bottom, #4a2511 0%, #2e1507 50%, #1d0c04 100%)',
+               boxShadow: 'inset 0 0 100px rgba(0,0,0,0.6)'
+             }}
+        >
+          {/* Efeito sutil de textura de madeira ao fundo */}
+          <div className="absolute inset-0 opacity-15 pointer-events-none bg-[radial-gradient(#d4a373_1px,transparent_1px)] [background-size:16px_16px]" />
+
+          {/* Grid de Capas da Banca estilo Estante */}
+          <div className="relative z-10 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-x-6 gap-y-12">
+            {filteredArquivos.map((arq) => {
+              return (
+                <div
+                  key={arq.id}
+                  onClick={() => setSelectedFileForDetail(arq)}
+                  className="group flex flex-col items-center cursor-pointer select-none relative"
+                >
+                  {/* Capa com Efeito 3D de Livro/Revista */}
+                  <div className="relative w-full aspect-[3/4] rounded-lg overflow-hidden shadow-2xl transition duration-300 group-hover:-translate-y-2 group-hover:scale-105 group-hover:shadow-[0_20px_30px_rgba(0,0,0,0.7)] border-r-2 border-b-2 border-white/20 bg-white">
+                    {renderPublicationCover(arq)}
+
+                    {/* Lombada/Vinco lateral esquerda de livro/revista */}
+                    <div className="absolute top-0 bottom-0 left-0 w-3 bg-gradient-to-r from-black/60 via-black/20 to-transparent pointer-events-none" />
+
+                    {/* Selo Confidencial se aplicável */}
+                    {arq.is_confidencial && (
+                      <div className="absolute top-2 right-2 p-1 rounded bg-[#910113]/90 text-white shadow-md">
+                        <Lock className="w-3 h-3" />
+                      </div>
+                    )}
+
+                    {/* Overlay hover com botão de ação */}
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-3 text-center text-white backdrop-blur-[2px]">
+                      <Eye className="w-6 h-6 text-[#57a0ff] mb-2" />
+                      <span className="text-[11px] font-bold line-clamp-2 leading-tight">
+                        {arq.titulo}
+                      </span>
+                      <span className="text-[9px] uppercase tracking-wider text-slate-300 mt-2 px-2 py-0.5 rounded-full bg-white/20">
+                        Clique para abrir
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Prateleira / Estante abaixo da publicação */}
+                  <div
+                    className="w-[115%] h-3.5 -mt-1 rounded-sm shadow-md"
+                    style={{
+                      background: 'linear-gradient(to bottom, #8a4e25 0%, #572d11 60%, #301708 100%)',
+                      borderTop: '1px solid rgba(255,255,255,0.25)',
+                      boxShadow: '0 8px 12px rgba(0,0,0,0.5)'
+                    }}
+                  />
+
+                  {/* Legenda sutil da publicação */}
+                  <div className="mt-2 text-center w-full">
+                    <p className="text-xs font-bold text-amber-100/90 group-hover:text-white truncate">
+                      {arq.titulo}
+                    </p>
+                    <span className="text-[10px] text-amber-200/60 font-medium">
+                      {arq.ano_publicacao || 2026} • {arq.categoria_nome || 'Publicação'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       ) : viewMode === 'carousel' ? (
         /* VISUALIZAÇÃO EM CARROSSEL */
