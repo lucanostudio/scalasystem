@@ -46,6 +46,9 @@ export const AcervoView: React.FC = () => {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'banca' | 'grid' | 'carousel' | 'table'>('banca');
+  const [isAcervoSearchOpen, setIsAcervoSearchOpen] = useState(false);
+  const [acervoSearchTerm, setAcervoSearchTerm] = useState('');
+  const [selectedSearchResult, setSelectedSearchResult] = useState<Arquivo | null>(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
 
   // Filtros Avançados & Drawer
@@ -493,7 +496,7 @@ export const AcervoView: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           {canUpload && (
             <button
               onClick={() => setIsUploadOpen(true)}
@@ -502,6 +505,19 @@ export const AcervoView: React.FC = () => {
               <Plus className="w-4 h-4" /> Novo Upload
             </button>
           )}
+
+          <button
+            onClick={() => {
+              setAcervoSearchTerm('');
+              setSelectedSearchResult(null);
+              setIsAcervoSearchOpen(true);
+            }}
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-[#013375] to-[#03889c] hover:from-[#57a0ff] hover:to-[#03889c] text-white hover:text-[#010101] font-bold text-xs uppercase tracking-wider px-4 py-3 rounded-2xl shadow-lg shadow-[#013375]/20 transition duration-200 cursor-pointer"
+            title="Pesquisar em todos os documentos, fotos e vídeos do acervo"
+          >
+            <Search className="w-4 h-4" />
+            <span>Pesquisar no Acervo</span>
+          </button>
 
           <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 shadow-xs">
             <button
@@ -1471,6 +1487,211 @@ export const AcervoView: React.FC = () => {
           loadAcervo();
         }}
       />
+
+      {/* Modal de Pesquisa Interativa no Acervo Digital */}
+      {isAcervoSearchOpen && (() => {
+        const termo = acervoSearchTerm.trim().toLowerCase();
+        const palavras = termo ? termo.split(/\s+/).filter(Boolean) : [];
+        const resultadosBusca = palavras.length === 0
+          ? []
+          : arquivos.filter((arq) => {
+              const textoCompleto = [
+                arq.titulo,
+                arq.nome_original,
+                arq.descricao || '',
+                arq.autor || '',
+                arq.departamento || '',
+                arq.categoria_nome || '',
+                arq.tipo_mime || '',
+                String(arq.ano_publicacao || ''),
+                ...(Array.isArray(arq.tags) ? arq.tags : []),
+              ]
+                .join(' ')
+                .toLowerCase();
+              return palavras.every((p) => textoCompleto.includes(p));
+            });
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#010101]/60 backdrop-blur-xs p-4">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden border border-[#013375]/15">
+              {/* Cabeçalho */}
+              <div className="bg-gradient-to-r from-[#013375] to-[#03889c] px-6 py-4 flex items-center justify-between text-white">
+                <div className="flex items-center gap-3">
+                  <Search className="w-5 h-5" />
+                  <div>
+                    <h2 className="text-base font-black tracking-tight">Pesquisar no Acervo Digital</h2>
+                    <p className="text-xs text-white/80">
+                      Busque por qualquer palavra em documentos, fotos e vídeos cadastrados
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsAcervoSearchOpen(false)}
+                  className="p-1.5 rounded-xl hover:bg-white/20 transition cursor-pointer"
+                  aria-label="Fechar pesquisa"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Campo de Busca */}
+              <div className="p-5 border-b border-slate-100 bg-[#eef5fe]/50">
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#013375]" />
+                  <input
+                    type="text"
+                    autoFocus
+                    value={acervoSearchTerm}
+                    onChange={(e) => {
+                      setAcervoSearchTerm(e.target.value);
+                      setSelectedSearchResult(null);
+                    }}
+                    placeholder="Digite qualquer palavra-chave (título, tag, autor, departamento, descrição...)"
+                    className="w-full bg-white border-2 border-[#013375]/25 focus:border-[#013375] rounded-2xl pl-12 pr-10 py-3 text-sm font-medium text-[#010101] placeholder-slate-400 focus:outline-none shadow-xs"
+                  />
+                  {acervoSearchTerm && (
+                    <button
+                      onClick={() => {
+                        setAcervoSearchTerm('');
+                        setSelectedSearchResult(null);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 cursor-pointer"
+                      title="Limpar busca"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Resultados */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-3">
+                {palavras.length === 0 ? (
+                  <div className="text-center py-10 text-slate-400 text-sm">
+                    Digite uma ou mais palavras acima para localizar documentos, fotos e vídeos no acervo.
+                  </div>
+                ) : resultadosBusca.length === 0 ? (
+                  <div className="text-center py-10 space-y-3">
+                    <p className="text-sm font-semibold text-slate-600">
+                      Nenhum arquivo encontrado para &ldquo;{acervoSearchTerm}&rdquo;.
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      O que você deseja fazer? Tente outra palavra-chave ou limpe a busca.
+                    </p>
+                    <button
+                      onClick={() => setAcervoSearchTerm('')}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer transition"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" /> Nova busca
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between text-xs text-slate-500 font-semibold pb-1">
+                      <span>
+                        {resultadosBusca.length} {resultadosBusca.length === 1 ? 'resultado encontrado' : 'resultados encontrados'}
+                      </span>
+                      <span>Selecione um item ou escolha uma ação abaixo</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {resultadosBusca.map((arq) => {
+                        const isSelected = selectedSearchResult?.id === arq.id;
+                        const isVideo = arq.tipo_mime?.startsWith('video/');
+                        const isImage = arq.tipo_mime?.startsWith('image/');
+                        return (
+                          <div
+                            key={arq.id}
+                            onClick={() => setSelectedSearchResult(arq)}
+                            className={`p-3.5 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-3 ${
+                              isSelected
+                                ? 'border-[#013375] bg-[#eef5fe]'
+                                : 'border-slate-200 hover:border-[#013375]/40 hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-10 h-10 rounded-xl bg-[#013375]/10 text-[#013375] flex items-center justify-center shrink-0">
+                                {isVideo ? (
+                                  <Video className="w-5 h-5" />
+                                ) : isImage ? (
+                                  <FileImage className="w-5 h-5" />
+                                ) : (
+                                  <FileText className="w-5 h-5" />
+                                )}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-bold text-[#010101] truncate">{arq.titulo}</p>
+                                <p className="text-xs text-slate-500 truncate">
+                                  {isVideo ? 'Vídeo' : isImage ? 'Foto' : 'Documento'} • {arq.departamento || 'Geral'} • {arq.ano_publicacao || '-'}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-white border border-slate-200 text-slate-600 shrink-0">
+                              {isSelected ? 'Selecionado' : 'Selecionar'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Pergunta ao usuário o que quer fazer */}
+              {resultadosBusca.length > 0 && (
+                <div className="p-5 border-t border-slate-200 bg-slate-50 space-y-3">
+                  <p className="text-xs font-black uppercase tracking-wider text-[#013375]">
+                    {selectedSearchResult
+                      ? `O que você quer fazer com "${selectedSearchResult.titulo}"?`
+                      : 'O que você quer fazer com esta pesquisa?'}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    {selectedSearchResult && (
+                      <>
+                        <button
+                          onClick={() => {
+                            setSelectedFileForDetail(selectedSearchResult);
+                            setIsAcervoSearchOpen(false);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#013375] hover:bg-[#57a0ff] hover:text-[#010101] text-white text-xs font-bold cursor-pointer transition"
+                        >
+                          <Eye className="w-4 h-4" /> Visualizar Detalhes
+                        </button>
+                        <button
+                          onClick={() => {
+                            downloadFile(selectedSearchResult.url_armazenamento, selectedSearchResult.nome_original || selectedSearchResult.titulo);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#03889c] hover:bg-[#03889c]/90 text-white text-xs font-bold cursor-pointer transition"
+                        >
+                          <Download className="w-4 h-4" /> Baixar Arquivo
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => {
+                        setSearchTerm(acervoSearchTerm);
+                        setIsAcervoSearchOpen(false);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white border border-[#013375]/30 hover:bg-[#eef5fe] text-[#013375] text-xs font-bold cursor-pointer transition"
+                    >
+                      <Search className="w-4 h-4" /> Filtrar no Acervo Principal
+                    </button>
+                    <button
+                      onClick={() => {
+                        setAcervoSearchTerm('');
+                        setSelectedSearchResult(null);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 text-xs font-bold cursor-pointer transition"
+                    >
+                      <RotateCcw className="w-4 h-4" /> Nova Busca
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

@@ -9,7 +9,6 @@ import {
   LogOut, 
   FolderTree,
   UserCheck,
-  Search,
   Bell,
   Briefcase,
   Megaphone
@@ -26,8 +25,6 @@ interface LayoutProps {
 export const DashboardLayout: React.FC<LayoutProps> = ({ 
   currentTab, 
   setCurrentTab, 
-  searchQuery = '', 
-  setSearchQuery, 
   children 
 }) => {
   const { user, logout } = useAuth();
@@ -128,19 +125,7 @@ export const DashboardLayout: React.FC<LayoutProps> = ({
       {/* Conteúdo Principal + Cabeçalho Superior */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Header */}
-        <header className="bg-white border-b border-[#013375]/10 px-6 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm shrink-0">
-          {/* Barra de busca rápida */}
-          <div className="relative w-full sm:w-96">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery && setSearchQuery(e.target.value)}
-              placeholder="Pesquisar arquivos, tags, departamento..."
-              className="w-full bg-[#eef5fe] border border-[#013375]/20 rounded-xl pl-10 pr-4 py-2 text-xs font-medium text-[#010101] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#013375]"
-            />
-          </div>
-
+        <header className="bg-white border-b border-[#013375]/10 px-6 py-3.5 flex flex-col sm:flex-row items-center justify-end gap-4 shadow-sm shrink-0">
           {/* Badges e Identificação do Usuário */}
           <div className="flex items-center gap-3 self-end sm:self-auto">
             <div className="flex items-center gap-2">
